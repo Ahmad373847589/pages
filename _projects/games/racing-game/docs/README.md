@@ -10,3 +10,5 @@ permalink: /racing-game/overview
 ## Guiding Text
 
 This track is designed for a single-player experience. <names>
+
+[Play the Racing Game]({{ site.baseurl }}/gamify/racing-game/)
