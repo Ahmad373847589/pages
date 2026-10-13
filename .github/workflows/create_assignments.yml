@@ -48,5 +48,5 @@ jobs:
           python3 scripts/sync_assignments.py \
             --root . \
             --base-url "$BASE_URL" \
-            --uid "$PAGES_BOT_UID" \
+            --uid "${PAGES_BOT_UID:-pages-bot}" \
             --password "$PAGES_BOT_PASSWORD"
