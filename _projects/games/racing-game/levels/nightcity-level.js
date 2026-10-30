@@ -1,143 +1,16 @@
 import GameObject from '@assets/js/GameEnginev1.1/essentials/GameObject.js';
 import GameEnvBackground from '@assets/js/GameEnginev1.1/essentials/GameEnvBackground.js';
-import Player from '@assets/js/GameEnginev1.1/essentials/Player.js';
+import EnginePlayer from '@assets/js/GameEnginev1.1/essentials/Player.js';
 import SplineBarrier from '@assets/js/GameEnginev1.1/essentials/SplineBarrier.js';
+import TimeLapScreen from './TimeLapScreen.js';
 
-class TimeLapScreen extends GameObject {
-  constructor(data = {}, gameEnv = null) {
-    super(gameEnv);
-    this.data = data;
-    this.totalLaps = Number.isFinite(data.totalLaps) ? data.totalLaps : 3;
-    this.currentLap = Number.isFinite(data.currentLap) ? data.currentLap : 1;
-    this.startedAt = null;
-    this.finishedAt = null;
-    this.lapArmed = false;
-    this.previousPlayerPosition = null;
-    this.player = gameEnv?.gameObjects?.find((object) => object instanceof NightCityPlayer);
-    this.panel = { x: 18, y: 18, width: 240, height: 138 };
-  }
-
-  update() {
-    if (this.player?.selected) {
-      const now = performance.now();
-      if (this.startedAt === null) {
-        this.startedAt = now;
-      }
-      this.updateLapProgress(now);
-    }
-    this.draw();
-  }
-
-  updateLapProgress(now) {
-    if (this.finishedAt !== null || !this.player) {
-      return;
-    }
-
-    const center = this.player.getCenter();
-    const position = {
-      x: center.x / this.gameEnv.innerWidth,
-      y: center.y / this.gameEnv.innerHeight
-    };
-    const finishLineX = 0.5;
-    const finishLineYMin = 0.7;
-    const finishLineYMax = 0.85;
-
-    if (!this.lapArmed) {
-      if (Math.abs(position.x - finishLineX) >= 0.04) {
-        this.lapArmed = true;
-      }
-      this.previousPlayerPosition = position;
-      return;
-    }
-
-    const previousPosition = this.previousPlayerPosition;
-    const crossedFinishLine = previousPosition
-      && ((previousPosition.x < finishLineX && position.x >= finishLineX)
-        || (previousPosition.x > finishLineX && position.x <= finishLineX))
-      && previousPosition.y >= finishLineYMin
-      && previousPosition.y <= finishLineYMax
-      && position.y >= finishLineYMin
-      && position.y <= finishLineYMax;
-
-    if (crossedFinishLine) {
-      this.currentLap = Math.min(this.currentLap + 1, this.totalLaps);
-      this.lapArmed = false;
-      if (this.currentLap >= this.totalLaps) {
-        this.finishedAt = now;
-      }
-    }
-
-    this.previousPlayerPosition = position;
-  }
-
-  draw() {
-    const ctx = this.gameEnv && this.gameEnv.ctx;
-    if (!ctx) {
-      return;
-    }
-
-    const elapsedMs = this.startedAt === null
-      ? 0
-      : (this.finishedAt ?? performance.now()) - this.startedAt;
-    const timeLabel = this.formatTime(elapsedMs);
-    const lapLabel = this.finishedAt === null ? 'Lap ' + this.currentLap + '/' + this.totalLaps : 'FINISH!';
-    const { x, y, width, height } = this.panel;
-
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
-    ctx.fillRect(x, y, width, height);
-    ctx.strokeStyle = '#facc15';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, width, height);
-
-    ctx.fillStyle = '#f8fafc';
-    ctx.font = 'bold 16px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('TIME', x + 16, y + 28);
-    ctx.font = 'bold 22px sans-serif';
-    ctx.fillText(timeLabel, x + 16, y + 56);
-
-    ctx.fillStyle = '#7dd3fc';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.fillText('LAP', x + 16, y + 80);
-    ctx.fillStyle = '#bbf7d0';
-    ctx.fillText(lapLabel, x + 72, y + 80);
-
-    ctx.fillStyle = '#facc15';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.fillText(this.player?.getBoostLabel() || 'BOOST READY', x + 16, y + 105);
-    ctx.fillStyle = '#cbd5e1';
-    ctx.font = '11px sans-serif';
-    ctx.fillText('WASD DRIVE   SPACE DRIFT   SHIFT BOOST', x + 16, y + 126);
-  }
-
-  formatTime(ms) {
-    const totalSeconds = Math.max(0, ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = Math.floor(totalSeconds % 60);
-    const tenths = Math.floor((totalSeconds * 10) % 10);
-    return String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0') + '.' + tenths;
-  }
-
-  resize() {
-    this.draw();
-  }
-
-  destroy() {
-    const gameObjects = this.gameEnv && this.gameEnv.gameObjects;
-    const index = gameObjects ? gameObjects.indexOf(this) : -1;
-    if (index !== -1 && gameObjects) {
-      gameObjects.splice(index, 1);
-    }
-  }
-}
-
-class NightCityPlayer extends Player {
+class Player extends EnginePlayer {
   constructor(data = {}, gameEnv = null) {
     super(data, gameEnv);
     this.isPlayer = true;
     this.selected = false;
     this.visible = false;
-    this.heading = -Math.PI / 2;
+    this.heading = 0;
     this.motionVelocity = { x: 0, y: 0 };
     this.lastPhysicsUpdate = performance.now();
     this.boostDuration = 3000;
@@ -150,13 +23,23 @@ class NightCityPlayer extends Player {
 
   handleKeyDown(event) {
     const keyCode = event.keyCode ?? event.which ?? (event.key === 'Shift' ? 16 : event.key === ' ' ? 32 : 0);
+    const target = event.target;
+    const editing = target?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target?.tagName || '');
+    const control = this.gameEnv?.gameControl;
+    if (!this.selected || editing || event.altKey || event.ctrlKey || event.metaKey || !control || control.isPaused) {
+      return;
+    }
+    if (this.gameEnv.container?.isConnected === false) {
+      return;
+    }
+
     if (keyCode === 16 || keyCode === 32) {
       event.preventDefault();
     }
     if (keyCode === 16 && !event.repeat) {
       this.activateBoost();
     }
-    super.handleKeyDown({ keyCode });
+    super.handleKeyDown(event);
   }
 
   handleKeyUp(event) {
@@ -175,8 +58,9 @@ class NightCityPlayer extends Player {
 
   updateDirection() {}
 
-  selectCar(src) {
+  selectCar(src, name) {
     this.spriteData.src = src;
+    this.spriteData.name = name;
     this.spriteReady = false;
     this.spriteSheet = new Image();
     this.spriteSheet.onload = () => {
@@ -285,7 +169,7 @@ class NightCityPlayer extends Player {
 class NightCityCarSelection extends GameObject {
   constructor(data = {}, gameEnv = null) {
     super(gameEnv);
-    this.player = gameEnv?.gameObjects?.find((object) => object instanceof NightCityPlayer);
+    this.player = gameEnv?.gameObjects?.find((object) => object?.isPlayer === true);
     if (!this.player) {
       throw new Error('Night City car selection requires a NightCityPlayer');
     }
@@ -322,8 +206,8 @@ class NightCityCarSelection extends GameObject {
     const buttons = document.createElement('div');
     Object.assign(buttons.style, { display: 'flex', gap: '12px', justifyContent: 'center' });
     buttons.append(
-    this.createCarButton('Red car', '#dc2626', '/images/projects/racing-game/Red_Car.png'),
-    this.createCarButton('Blue car', '#2563eb', '/images/projects/racing-game/Blue_Car.png')
+      this.createCarButton('Red Car', '#dc2626', `${gameEnv.path}/images/projects/racing-game/Red_Car.png`),
+      this.createCarButton('Blue Car', '#2563eb', `${gameEnv.path}/images/projects/racing-game/Blue_Car.png`)
     );
     panel.appendChild(buttons);
     this.element.appendChild(panel);
@@ -346,8 +230,8 @@ class NightCityCarSelection extends GameObject {
       cursor: 'pointer'
     });
     button.addEventListener('click', () => {
-      this.player.selectCar(sprite);
-      this.element.remove();
+      this.player.selectCar(sprite, label);
+      this.destroy();
     });
     return button;
   }
@@ -367,17 +251,19 @@ class NightCityCarSelection extends GameObject {
 
 class GameLevelNightcity {
   constructor(gameEnv = {}) {
+    const path = gameEnv.path || '';
     const background_data = {
       name: "Night City Course",
       greeting: "Welcome to the Night City!",
-      src: "/images/projects/racing-game/nightcitylevel.png",
+      src: `${path}/images/projects/racing-game/nightcitylevel.png`,
       pixels: { height: 522, width: 815 }
     };
     const player_data = {
         name: "Red Car",
         greeting: "I'm the red car!",
-        src: "/images/projects/racing-game/Red_Car.png",
+        src: `${path}/images/projects/racing-game/Red_Car.png`,
         INIT_POSITION: { x: 0.47, y: 0.76 },
+        direction: { default: 'right', index: 1 },
         SCALE_FACTOR: 10,
         STEP_FACTOR: 1600,
         pixels: { height: 768, width: 1152 },
@@ -394,8 +280,10 @@ class GameLevelNightcity {
         keypress: { up: 87, left: 65, down: 83, right: 68 } // W, A, S, D
     };
     const timer_data = {
-      currentLap: 1,
-      totalLaps: 3
+      totalLaps: 3,
+      finishLine: { x: 0.5, top: 0.77, bottom: 0.91 },
+      hudPosition: { x: 0.01, y: 0.02 },
+      showLosingScreen: false
     };
     const trackBarrierData = [
       {
@@ -495,7 +383,7 @@ class GameLevelNightcity {
     ];
     this.classes = [
         {class: GameEnvBackground, data: background_data},
-        {class: NightCityPlayer, data: player_data},
+        {class: Player, data: player_data},
         {class: NightCityCarSelection, data: {}},
         {class: TimeLapScreen, data: timer_data},
         ...trackBarrierData.map((data) => ({ class: SplineBarrier, data }))
@@ -503,4 +391,5 @@ class GameLevelNightcity {
   }
 }
 
+export { Player as NightCityPlayer };
 export default GameLevelNightcity;

@@ -7,6 +7,7 @@ import {
   pressKey,
   releaseKey,
 } from '@assets/js/GameEnginev1.1/test/keyboard-test-helper.mjs';
+import { NightCityPlayer } from '../levels/nightcity-level.js';
 
 const arrows = { up: 38, left: 37, down: 40, right: 39 };
 const wasd = { up: 87, left: 65, down: 83, right: 68 };
@@ -32,6 +33,66 @@ function accelerationFixture() {
   player.move = () => {};
   return player;
 }
+
+function nightCityFixture(gameEnv) {
+  const player = createKeyboardPlayer(NightCityPlayer, { keypress: wasd, gameEnv });
+  Object.assign(player, {
+    selected: true,
+    boostDuration: 3000,
+    boostCooldown: 12000,
+    boostEndsAt: 0,
+    boostReadyAt: 0,
+  });
+  return player;
+}
+
+test('Night City preserves full keyboard events and ignores inactive or non-game input', () => {
+  const player = nightCityFixture();
+  assert.equal(pressKey(player, 87).defaultPrevented, false);
+  assert.equal(player.pressedKeys[87], true);
+  releaseKey(player, 87);
+  assert.deepEqual(player.pressedKeys, {});
+
+  for (const options of [
+    { target: { tagName: 'INPUT' } },
+    { target: { isContentEditable: true } },
+    { ctrlKey: true },
+    { metaKey: true },
+  ]) {
+    const guardedPlayer = nightCityFixture();
+    pressKey(guardedPlayer, 87, options);
+    assert.deepEqual(guardedPlayer.pressedKeys, {});
+  }
+
+  for (const gameEnv of [
+    { gameControl: { isPaused: true }, container: { isConnected: true } },
+    { gameControl: { isPaused: false }, container: { isConnected: false } },
+  ]) {
+    const guardedPlayer = nightCityFixture(gameEnv);
+    pressKey(guardedPlayer, 87);
+    assert.deepEqual(guardedPlayer.pressedKeys, {});
+  }
+
+  const unselectedPlayer = nightCityFixture();
+  unselectedPlayer.selected = false;
+  pressKey(unselectedPlayer, 87);
+  assert.deepEqual(unselectedPlayer.pressedKeys, {});
+});
+
+test('Night City drift and boost keys are handled only by the selected car', () => {
+  const player = nightCityFixture();
+  assert.equal(pressKey(player, 32).defaultPrevented, true);
+  assert.equal(player.pressedKeys[32], true);
+  releaseKey(player, 32);
+  assert.deepEqual(player.pressedKeys, {});
+
+  const beforeBoost = performance.now();
+  assert.equal(pressKey(player, 16).defaultPrevented, true);
+  const boostEndsAt = player.boostEndsAt;
+  assert.ok(boostEndsAt > beforeBoost);
+  pressKey(player, 16, { repeat: true });
+  assert.equal(player.boostEndsAt, boostEndsAt);
+});
 
 test('racing inherits arrow scroll prevention and real engine movement', () => {
   const player = fixture();

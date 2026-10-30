@@ -11,6 +11,7 @@ export default class Player extends EnginePlayer {
     this.acceleration = data.acceleration;
     this.deceleration = data.deceleration;
     this.reverseSpeed = data.reverseSpeed;
+    this.lastMovementDirection = null;
   }
 
   handleKeyDown(event) {
@@ -54,6 +55,16 @@ export default class Player extends EnginePlayer {
       this.moved = true;
       if (keysPressed[up]) this.velocity.y -= this.yVelocity;
       else if (keysPressed[down]) this.velocity.y += this.yVelocity;
+    }
+
+    if (this.moved) {
+      this.lastMovementDirection = {
+        x: Math.sign(this.velocity.x),
+        y: Math.sign(this.velocity.y),
+      };
+    } else if (this.currentSpeed !== 0 && this.lastMovementDirection) {
+      this.velocity.x = this.lastMovementDirection.x * this.xVelocity;
+      this.velocity.y = this.lastMovementDirection.y * this.yVelocity;
     }
   }
 
