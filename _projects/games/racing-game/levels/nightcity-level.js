@@ -131,9 +131,14 @@ class NightCityPlayer extends Player {
   }
 
   handleKeyDown(event) {
-    const keyCode = event.keyCode ?? event.which ?? (event.key === 'Shift' ? 16 : event.key === ' ' ? 32 : 0);
+    let keyCode = event.keyCode ?? event.which;
+    if (!keyCode && event.key) {
+      const keyMap = { 'w':87, 'W':87, 'a':65, 'A':65, 's':83, 'S':83, 'd':68, 'D':68, 'Shift':16, ' ':32 };
+      keyCode = keyMap[event.key] || 0;
+    }
+    
     if (keyCode === 16 || keyCode === 32) {
-      event.preventDefault();
+      event.preventDefault?.();
     }
     if (keyCode === 16 && !event.repeat) {
       this.activateBoost();
@@ -142,7 +147,11 @@ class NightCityPlayer extends Player {
   }
 
   handleKeyUp(event) {
-    const keyCode = event.keyCode ?? event.which ?? (event.key === 'Shift' ? 16 : event.key === ' ' ? 32 : 0);
+    let keyCode = event.keyCode ?? event.which;
+    if (!keyCode && event.key) {
+      const keyMap = { 'w':87, 'W':87, 'a':65, 'A':65, 's':83, 'S':83, 'd':68, 'D':68, 'Shift':16, ' ':32 };
+      keyCode = keyMap[event.key] || 0;
+    }
     super.handleKeyUp({ keyCode });
   }
 
@@ -160,15 +169,15 @@ class NightCityPlayer extends Player {
   selectCar(src) {
     this.spriteData.src = src;
     this.spriteReady = false;
-    this.spriteSheet = new Image();
-    this.spriteSheet.onload = () => {
+    this.image = new Image(); 
+    this.image.onload = () => {
       this.spriteReady = true;
       this.resize();
     };
-    this.spriteSheet.onerror = () => {
+    this.image.onerror = () => {
       console.error(`Night City car sprite failed to load: ${src}`);
     };
-    this.spriteSheet.src = src;
+    this.image.src = src;
     this.lastPhysicsUpdate = performance.now();
     this.selected = true;
     this.visible = true;
@@ -304,8 +313,8 @@ class NightCityCarSelection extends GameObject {
     const buttons = document.createElement('div');
     Object.assign(buttons.style, { display: 'flex', gap: '12px', justifyContent: 'center' });
     buttons.append(
-    this.createCarButton('Red car', '#dc2626', '/images/projects/racing-game/Red_Car.png'),
-    this.createCarButton('Blue car', '#2563eb', '/images/projects/racing-game/Blue_Car.png')
+      this.createCarButton('Red car', '#dc2626', '/images/projects/racing-game/Red_Car.png'),
+      this.createCarButton('Blue car', '#2563eb', '/images/projects/racing-game/Blue_Car.png')
     );
     panel.appendChild(buttons);
     this.element.appendChild(panel);
@@ -356,24 +365,24 @@ class GameLevelNightcity {
       pixels: { height: 522, width: 815 }
     };
     const player_data = {
-        name: "Red Car",
-        greeting: "I'm the red car!",
-        src: "/images/projects/racing-game/Red_Car.png",
-        INIT_POSITION: { x: 0.47, y: 0.76 },
-        SCALE_FACTOR: 10,
-        STEP_FACTOR: 1600,
-        pixels: { height: 768, width: 1152 },
-        orientation: { rows: 4, columns: 4 },
-        up:        { row: 3, start: 0, columns: 1 },
-        upRight:   { row: 0, start: 2, columns: 1, rotate: Math.PI },
-        right:     { row: 1, start: 0, columns: 1 },
-        downRight: { row: 2, start: 0, columns: 1 },
-        down:      { row: 0, start: 0, columns: 1 },
-        downLeft:  { row: 0, start: 2, columns: 1 },
-        left:      { row: 3, start: 2, columns: 1 },
-        upLeft:    { row: 2, start: 0, columns: 1, rotate: Math.PI },
-        hitbox: { widthPercentage: 0.5, heightPercentage: 0.5 },
-        keypress: { up: 87, left: 65, down: 83, right: 68 } // W, A, S, D
+      name: "Red Car",
+      greeting: "I'm the red car!",
+      src: "/images/projects/racing-game/Red_Car.png",
+      INIT_POSITION: { x: 0.47, y: 0.76 },
+      SCALE_FACTOR: 10,
+      STEP_FACTOR: 1600,
+      pixels: { height: 768, width: 1152 },
+      orientation: { rows: 4, columns: 4 },
+      up:        { row: 3, start: 0, columns: 1 },
+      upRight:   { row: 0, start: 2, columns: 1, rotate: Math.PI },
+      right:     { row: 1, start: 0, columns: 1 },
+      downRight: { row: 2, start: 0, columns: 1 },
+      down:      { row: 0, start: 0, columns: 1 },
+      downLeft:  { row: 0, start: 2, columns: 1 },
+      left:      { row: 3, start: 2, columns: 1 },
+      upLeft:    { row: 2, start: 0, columns: 1, rotate: Math.PI },
+      hitbox: { widthPercentage: 0.5, heightPercentage: 0.5 },
+      keypress: { up: 87, left: 65, down: 83, right: 68 } // W, A, S, D
     };
     const timer_data = {
       totalLaps: 3
@@ -381,7 +390,7 @@ class GameLevelNightcity {
     const trackBarrierData = [
       {
         id: 'nightcity-outer-track-barrier',
-        visible: false,
+        visible: true,
         collisionWidth: 12,
         coordinateSpace: 'normalized',
         splinePoints: [
@@ -428,7 +437,7 @@ class GameLevelNightcity {
       },
       {
         id: 'nightcity-inner-track-barrier',
-        visible: false,
+        visible: true,
         collisionWidth: 12,
         coordinateSpace: 'normalized',
         splinePoints: [
@@ -475,11 +484,11 @@ class GameLevelNightcity {
       }
     ];
     this.classes = [
-        {class: GameEnvBackground, data: background_data},
-        {class: NightCityPlayer, data: player_data},
-        {class: NightCityCarSelection, data: {}},
-        {class: TimeLapScreen, data: timer_data},
-        ...trackBarrierData.map((data) => ({ class: SplineBarrier, data }))
+      { class: GameEnvBackground, data: background_data },
+      { class: NightCityPlayer, data: player_data },
+      { class: NightCityCarSelection, data: {} },
+      { class: TimeLapScreen, data: timer_data },
+      ...trackBarrierData.map((data) => ({ class: SplineBarrier, data }))
     ];
   }
 }
